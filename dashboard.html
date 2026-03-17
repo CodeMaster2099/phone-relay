@@ -1,52 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
-        /* Restored Font Styles */
-        body {
-            font-family: 'Arial', sans-serif;
-            line-height: 1.6;
-        }
-        /* Improved Card Layout and Semantic Structure */
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin: 15px;
-        }
-        /* Pulse Animation */
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-    </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Life Dashboard</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:monospace;background:#0a0a0a;color:#eee;padding:1.5rem}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px}
+.logo{font-size:20px;letter-spacing:0.08em}
+.tagline{font-size:11px;color:#555;letter-spacing:0.1em}
+
+.conn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+input{
+  font-family:monospace;
+  font-size:12px;
+  width:300px;
+  padding:7px 10px;
+  background:#111;
+  border:0.5px solid #333;
+  color:#eee;
+  border-radius:8px;
+}
+
+.btn{
+  font-size:11px;
+  padding:7px 16px;
+  border-radius:8px;
+  border:0.5px solid #333;
+  background:#111;
+  color:#eee;
+  cursor:pointer;
+}
+
+.btn.active{background:#eee;color:#0a0a0a}
+
+.dot{width:7px;height:7px;border-radius:50%;background:#444}
+.dot.on{background:#3B6D11;animation:pulse 1.5s infinite}
+
+@keyframes pulse{
+  0%,100%{opacity:1}
+  50%{opacity:0.4}
+}
+
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:10px;margin-bottom:12px}
+
+.card{
+  background:#111;
+  border:0.5px solid #222;
+  border-radius:12px;
+  padding:14px;
+}
+
+.card-label{font-size:10px;color:#555;margin-bottom:6px}
+.card-val{font-size:24px}
+.card-sub{font-size:11px;color:#555}
+
+.bar-track{height:6px;background:#222;border-radius:3px;margin-top:10px}
+.bar-fill{height:100%;border-radius:3px}
+
+.map-box{
+  background:#111;
+  border:0.5px solid #222;
+  border-radius:12px;
+  overflow:hidden;
+  min-height:260px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.log-box{
+  height:110px;
+  overflow:auto;
+}
+
+.log-line{
+  font-size:11px;
+  color:#555;
+}
+
+img{
+  width:100%;
+  border-radius:10px;
+  border:1px solid #222;
+}
+</style>
 </head>
+
 <body>
-    <header>
-        <h1>Dashboard</h1>
-    </header>
-    <main>
-        <section class="cards">
-            <div class="card pulse">
-                <h2>Card Title</h2>
-                <p>Card description goes here.</p>
-            </div>
-            <div class="card">
-                <h2>Another Card</h2>
-                <p>Details of another card.</p>
-            </div>
-        </section>
-    </main>
-    <footer>
-        <p>© 2026 CodeMaster2099. All Rights Reserved.</p>
-    </footer>
+
+<div class="topbar">
+  <div>
+    <div class="logo">LIFE DASHBOARD</div>
+    <div class="tagline">live iphone telemetry</div>
+  </div>
+
+  <div class="conn-row">
+    <input id="relayInput" value="wss://phone-relay-production.up.railway.app"/>
+    <button class="btn" id="connBtn" onclick="toggleConn()">CONNECT</button>
+    <span class="dot" id="dot"></span>
+    <span id="connLabel">OFFLINE</span>
+  </div>
+</div>
+
+<div id="lastSeen">no data yet</div>
+
+<div class="grid4">
+  <div class="card"><div class="card-label">BATTERY</div><div id="v-bat" class="card-val">—</div></div>
+  <div class="card"><div class="card-label">STEPS</div><div id="v-steps" class="card-val">—</div></div>
+  <div class="card"><div class="card-label">NOISE</div><div id="v-noise" class="card-val">—</div></div>
+  <div class="card"><div class="card-label">PING</div><div id="v-ping" class="card-val">—</div></div>
+</div>
+
+<div class="grid2">
+  <div id="mapEl" class="map-box"></div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+
+  <div class="card">
+      <div class="card-label">CAMERA</div>
+      <div id="v-cam">not active</div>
+      <img id="camFeed"/>
+  </div>
+
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-label">LOG</div>
+  <div id="log" class="log-box"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script>
+let ws=null,map=null,marker=null,connected=false;
+
+function toggleConn(){
+  if(connected){ws.close();return;}
+
+  const url=document.getElementById('relayInput').value;
+
+  ws=new WebSocket(url);
+
+  ws.onopen=()=>{
+    connected=true;
+    document.getElementById('dot').classList.add("on");
+    document.getElementById('connLabel').textContent="LIVE";
+    document.getElementById('connBtn').textContent="DISCONNECT";
+    document.getElementById('connBtn').classList.add("active");
+  };
+
+  ws.onmessage=(e)=>{
+    const msg=JSON.parse(e.data);
+
+    // CAMERA
+    if(msg.type==="camera"){
+      document.getElementById('camFeed').src = msg.data;
+      document.getElementById('v-cam').textContent = "LIVE";
+      return;
+    }
+
+    // SENSOR
+    if(msg.type==="sensor"){
+      const d=msg.payload;
+
+      if(d.battery!=null) document.getElementById('v-bat').textContent=d.battery+"%";
+      if(d.steps!=null) document.getElementById('v-steps').textContent=d.steps;
+      if(d.noise!=null) document.getElementById('v-noise').textContent=d.noise;
+
+      if(msg.ts){
+        document.getElementById('v-ping').textContent=(Date.now()-msg.ts)+"ms";
+      }
+
+      document.getElementById('lastSeen').textContent=new Date().toLocaleTimeString();
+
+      if(d.gps){
+        const lat=parseFloat(d.gps.lat);
+        const lng=parseFloat(d.gps.lng);
+
+        if(!map){
+          map=L.map("mapEl").setView([lat,lng],15);
+
+          L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          ).addTo(map);
+
+          marker=L.marker([lat,lng]).addTo(map);
+        }else{
+          marker.setLatLng([lat,lng]);
+          map.panTo([lat,lng]);
+        }
+      }
+    }
+  };
+
+  ws.onclose=()=>{
+    connected=false;
+    document.getElementById('dot').classList.remove("on");
+    document.getElementById('connLabel').textContent="OFFLINE";
+    document.getElementById('connBtn').textContent="CONNECT";
+    document.getElementById('connBtn').classList.remove("active");
+  };
+}
+</script>
+
 </body>
 </html>
