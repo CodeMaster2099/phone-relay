@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Life Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:monospace;background:#0a0a0a;color:#eee;padding:1.5rem}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px}
+.logo{font-size:20px;font-weight:500;letter-spacing:0.08em}
+.tagline{font-size:11px;color:#555;letter-spacing:0.1em;margin-top:2px}
+.conn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=url]{font-family:monospace;font-size:12px;width:300px;padding:7px 10px;background:#111;border:0.5px solid #333;color:#eee;border-radius:8px}
+.btn{font-family:monospace;font-size:11px;letter-spacing:0.06em;padding:7px 16px;cursor:pointer;border-radius:8px;border:0.5px solid #333;background:#111;color:#eee}
+.btn.active{background:#eee;color:#0a0a0a}
+.dot{width:7px;height:7px;border-radius:50%;background:#444;display:inline-block}
+.dot.on{background:#3B6D11;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:10px;margin-bottom:12px}
+.card{background:#111;border:0.5px solid #222;border-radius:12px;padding:14px}
+.card-label{font-size:10px;letter-spacing:0.1em;color:#555;margin-bottom:6px}
+.card-val{font-size:24px;font-weight:500;color:#eee}
+.card-sub{font-size:11px;color:#555;margin-top:3px}
+.bar-track{height:6px;background:#222;border-radius:3px;overflow:hidden;margin-top:10px}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.map-box{background:#111;border:0.5px solid #222;border-radius:12px;overflow:hidden;min-height:260px;display:flex;align-items:center;justify-content:center}
+.map-placeholder{text-align:center;color:#444;font-size:12px;letter-spacing:0.08em}
+.tilt-wrap{display:flex;align-items:center;justify-content:center;margin:8px 0}
+.tilt-circle{width:110px;height:110px;border-radius:50%;border:0.5px solid #333;position:relative}
+.tilt-dot{width:14px;height:14px;border-radius:50%;background:#eee;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:top 0.15s,left 0.15s}
+.log-box{background:#111;border:0.5px solid #222;border-radius:12px;padding:12px;height:110px;overflow-y:auto}
+.log-line{font-size:11px;color:#555;padding:2px 0;border-bottom:0.5px solid #1a1a1a}
+.log-line .ts{color:#333;margin-right:8px}
+.last-seen{font-size:11px;color:#444;margin-bottom:1rem}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="logo">LIFE DASHBOARD</div>
+    <div class="tagline">live iphone telemetry</div>
+  </div>
+  <div class="conn-row">
+    <input type="url" id="relayInput" placeholder="wss://phone-relay-production.up.railway.app" value="wss://phone-relay-production.up.railway.app"/>
+    <button class="btn" id="connBtn" onclick="toggleConn()">CONNECT</button>
+    <span class="dot" id="dot"></span>
+    <span id="connLabel" style="font-size:11px;color:#444">OFFLINE</span>
+  </div>
+</div>
+
+<div class="last-seen" id="lastSeen">no data received yet</div>
+
+<div class="grid4">
+  <div class="card">
+    <div class="card-label">BATTERY</div>
+    <div class="card-val" id="v-bat">—</div>
+    <div class="bar-track"><div class="bar-fill" id="bat-fill" style="background:#3B6D11;width:0%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">STEPS</div>
+    <div class="card-val" id="v-steps">—</div>
+    <div class="card-sub">session count</div>
+  </div>
+  <div class="card">
+    <div class="card-label">NOISE</div>
+    <div class="card-val" id="v-noise">—</div>
+    <div class="bar-track"><div class="bar-fill" id="noise-fill" style="background:#185FA5;width:0%"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">PING</div>
+    <div class="card-val" id="v-ping">—</div>
+    <div class="card-sub">ms latency</div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="map-box" id="mapBox">
+    <div id="mapPlaceholder" class="map-placeholder">GPS AWAITING<br/><span id="v-coords" style="font-size:11px;margin-top:4px;display:block">—</span></div>
+    <div id="mapEl" style="width:100%;height:260px;display:none"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="card" style="flex:1">
+      <div class="card-label">TILT</div>
+      <div class="tilt-wrap">
+        <div class="tilt-circle"><div class="tilt-dot" id="tiltDot"></div></div>
+      </div>
+      <div class="card-sub" id="v-tilt" style="text-align:center">x: — / y: —</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CAMERA</div>
+      <div id="v-cam" style="font-size:12px;color:#555;margin-top:4px">not active</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-label" style="margin-bottom:8px">EVENT LOG</div>
+  <div class="log-box" id="log"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+let ws=null,map=null,marker=null,connected=false;
+
+function toggleConn(){
+  if(connected){ws&&ws.close();return;}
+  const url=document.getElementById('relayInput').value.trim();
+  if(!url)return;
+  ws=new WebSocket(url);
+  ws.onopen=()=>{
+    connected=true;
+    document.getElementById('dot').className='dot on';
+    document.getElementById('connLabel').textContent='LIVE';
+    document.getElementById('connBtn').textContent='DISCONNECT';
+    document.getElementById('connBtn').className='btn active';
+    addLog('connected to relay');
+  };
+  ws.onmessage=(e)=>{
+    try{const msg=JSON.parse(e.data);if(msg.type==='data')handleData(msg.payload,msg.ts);}catch(err){}
+  };
+  ws.onclose=()=>{
+    connected=false;
+    document.getElementById('dot').className='dot';
+    document.getElementById('connLabel').textContent='OFFLINE';
+    document.getElementById('connBtn').textContent='CONNECT';
+    document.getElementById('connBtn').className='btn';
+    addLog('disconnected');
+  };
+  ws.onerror=()=>addLog('connection error — check URL');
+}
+
+function handleData(d,ts){
+  const ping=ts?Date.now()-ts:null;
+  if(ping!==null)document.getElementById('v-ping').textContent=ping+'ms';
+  document.getElementById('lastSeen').textContent='last packet: '+new Date().toLocaleTimeString();
+
+  if(d.battery!=null){
+    document.getElementById('v-bat').textContent=d.battery+'%';
+    document.getElementById('bat-fill').style.width=d.battery+'%';
+    document.getElementById('bat-fill').style.background=d.battery<20?'#A32D2D':'#3B6D11';
+  }
+  if(d.steps!=null)document.getElementById('v-steps').textContent=d.steps;
+  if(d.noise!=null){
+    document.getElementById('v-noise').textContent=d.noise;
+    document.getElementById('noise-fill').style.width=Math.min(d.noise*2,100)+'%';
+  }
+  if(d.tilt){
+    const x=parseFloat(d.tilt.x)||0,y=parseFloat(d.tilt.y)||0;
+    document.getElementById('v-tilt').textContent='x: '+x+' / y: '+y;
+    const cx=50+Math.max(-40,Math.min(40,x*4));
+    const cy=50+Math.max(-40,Math.min(40,y*-4));
+    document.getElementById('tiltDot').style.left=cx+'%';
+    document.getElementById('tiltDot').style.top=cy+'%';
+  }
+  if(d.gps){
+    const lat=parseFloat(d.gps.lat),lng=parseFloat(d.gps.lng);
+    document.getElementById('v-coords').textContent=lat+', '+lng;
+    if(!map){
+      document.getElementById('mapPlaceholder').style.display='none';
+      const el=document.getElementById('mapEl');
+      el.style.display='block';
+      map=L.map(el).setView([lat,lng],15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(map);
+      marker=L.marker([lat,lng]).addTo(map);
+    } else {
+      marker.setLatLng([lat,lng]);
+      map.panTo([lat,lng]);
+    }
+  }
+  if(d.cam)document.getElementById('v-cam').textContent='active on phone';
+}
+
+function addLog(msg){
+  const log=document.getElementById('log');
+  const t=new Date().toLocaleTimeString();
+  const line=document.createElement('div');
+  line.className='log-line';
+  line.innerHTML='<span class="ts">'+t+'</span>'+msg;
+  log.prepend(line);
+  if(log.children.length>30)log.removeChild(log.lastChild);
+}
+</script>
+</body>
+</html>
