@@ -11,80 +11,43 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:monospace;background:#0a0a0a;color:#eee;padding:1.5rem}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px}
-.logo{font-size:20px;letter-spacing:0.08em}
-.tagline{font-size:11px;color:#555;letter-spacing:0.1em}
+.topbar{display:flex;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px}
+.logo{font-size:20px}
+.tagline{font-size:11px;color:#555}
 
-.conn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.conn-row{display:flex;gap:8px;align-items:center}
 
 input{
-  font-family:monospace;
-  font-size:12px;
-  width:300px;
-  padding:7px 10px;
+  width:280px;
+  padding:6px;
   background:#111;
-  border:0.5px solid #333;
+  border:1px solid #333;
   color:#eee;
-  border-radius:8px;
 }
 
 .btn{
-  font-size:11px;
-  padding:7px 16px;
-  border-radius:8px;
-  border:0.5px solid #333;
+  padding:6px 14px;
+  border:1px solid #333;
   background:#111;
   color:#eee;
   cursor:pointer;
 }
 
-.btn.active{background:#eee;color:#0a0a0a}
+.btn.active{background:#eee;color:#000}
 
-.dot{width:7px;height:7px;border-radius:50%;background:#444}
-.dot.on{background:#3B6D11;animation:pulse 1.5s infinite}
+.dot{width:8px;height:8px;border-radius:50%;background:#444}
+.dot.on{background:#3B6D11}
 
-@keyframes pulse{
-  0%,100%{opacity:1}
-  50%{opacity:0.4}
-}
-
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
-.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:10px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
 
 .card{
   background:#111;
-  border:0.5px solid #222;
-  border-radius:12px;
-  padding:14px;
+  border:1px solid #222;
+  padding:10px;
+  border-radius:10px;
 }
 
-.card-label{font-size:10px;color:#555;margin-bottom:6px}
-.card-val{font-size:24px}
-.card-sub{font-size:11px;color:#555}
-
-.bar-track{height:6px;background:#222;border-radius:3px;margin-top:10px}
-.bar-fill{height:100%;border-radius:3px}
-
-.map-box{
-  background:#111;
-  border:0.5px solid #222;
-  border-radius:12px;
-  overflow:hidden;
-  min-height:260px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.log-box{
-  height:110px;
-  overflow:auto;
-}
-
-.log-line{
-  font-size:11px;
-  color:#555;
-}
+.map{height:250px;margin-bottom:10px}
 
 img{
   width:100%;
@@ -104,38 +67,26 @@ img{
 
   <div class="conn-row">
     <input id="relayInput" value="wss://phone-relay-production.up.railway.app"/>
-    <button class="btn" id="connBtn" onclick="toggleConn()">CONNECT</button>
-    <span class="dot" id="dot"></span>
+    <button id="connBtn" class="btn" onclick="toggleConn()">CONNECT</button>
+    <span id="dot" class="dot"></span>
     <span id="connLabel">OFFLINE</span>
   </div>
 </div>
 
 <div id="lastSeen">no data yet</div>
 
-<div class="grid4">
-  <div class="card"><div class="card-label">BATTERY</div><div id="v-bat">—</div></div>
-  <div class="card"><div class="card-label">STEPS</div><div id="v-steps">—</div></div>
-  <div class="card"><div class="card-label">NOISE</div><div id="v-noise">—</div></div>
-  <div class="card"><div class="card-label">PING</div><div id="v-ping">—</div></div>
+<div class="grid">
+  <div class="card">BATTERY: <span id="v-bat">—</span></div>
+  <div class="card">STEPS: <span id="v-steps">—</span></div>
+  <div class="card">NOISE: <span id="v-noise">—</span></div>
+  <div class="card">PING: <span id="v-ping">—</span></div>
 </div>
 
-<div class="grid2">
-  <div id="mapEl" class="map-box"></div>
-
-  <div style="display:flex;flex-direction:column;gap:10px">
-
-    <div class="card">
-      <div class="card-label">CAMERA</div>
-      <div id="v-cam">not active</div>
-      <img id="camFeed"/>
-    </div>
-
-  </div>
-</div>
+<div id="mapEl" class="map"></div>
 
 <div class="card">
-  <div class="card-label">LOG</div>
-  <div id="log" class="log-box"></div>
+  <div>CAMERA: <span id="v-cam">not active</span></div>
+  <img id="camFeed"/>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -144,43 +95,55 @@ img{
 let ws=null,map=null,marker=null,connected=false;
 
 function toggleConn(){
-  if(connected){ws.close();return;}
+  if(connected){
+    ws.close();
+    return;
+  }
 
   const url=document.getElementById('relayInput').value;
-
   ws=new WebSocket(url);
 
   ws.onopen=()=>{
     connected=true;
-    dot.classList.add("on");
-    connLabel.textContent="LIVE";
-    connBtn.textContent="DISCONNECT";
-    connBtn.classList.add("active");
+    document.getElementById('dot').classList.add("on");
+    document.getElementById('connLabel').textContent="LIVE";
+    document.getElementById('connBtn').textContent="DISCONNECT";
+    document.getElementById('connBtn').classList.add("active");
   };
 
   ws.onmessage=(e)=>{
-    const msg=JSON.parse(e.data);
-
-    // CAMERA
-    if(msg.type==="camera"){
-      camFeed.src = msg.data;
-      v-cam.textContent = "LIVE";
+    let msg;
+    try{
+      msg=JSON.parse(e.data);
+    }catch{
       return;
     }
 
-    // SENSOR
+    // 📷 CAMERA
+    if(msg.type==="camera"){
+      document.getElementById('camFeed').src = msg.data;
+      document.getElementById('v-cam').textContent = "LIVE";
+      return;
+    }
+
+    // 📊 SENSOR
     if(msg.type==="sensor"){
       const d=msg.payload;
 
-      if(d.battery!=null) v-bat.textContent=d.battery+"%";
-      if(d.steps!=null) v-steps.textContent=d.steps;
-      if(d.noise!=null) v-noise.textContent=d.noise;
+      if(d.battery!=null)
+        document.getElementById('v-bat').textContent=d.battery+"%";
 
-      if(msg.ts){
-        v-ping.textContent=(Date.now()-msg.ts)+"ms";
-      }
+      if(d.steps!=null)
+        document.getElementById('v-steps').textContent=d.steps;
 
-      lastSeen.textContent=new Date().toLocaleTimeString();
+      if(d.noise!=null)
+        document.getElementById('v-noise').textContent=d.noise;
+
+      if(msg.ts)
+        document.getElementById('v-ping').textContent=(Date.now()-msg.ts)+"ms";
+
+      document.getElementById('lastSeen').textContent=
+        "last: "+new Date().toLocaleTimeString();
 
       if(d.gps){
         const lat=parseFloat(d.gps.lat);
@@ -189,9 +152,8 @@ function toggleConn(){
         if(!map){
           map=L.map("mapEl").setView([lat,lng],15);
 
-          L.tileLayer(
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          ).addTo(map);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+            .addTo(map);
 
           marker=L.marker([lat,lng]).addTo(map);
         }else{
@@ -204,10 +166,10 @@ function toggleConn(){
 
   ws.onclose=()=>{
     connected=false;
-    dot.classList.remove("on");
-    connLabel.textContent="OFFLINE";
-    connBtn.textContent="CONNECT";
-    connBtn.classList.remove("active");
+    document.getElementById('dot').classList.remove("on");
+    document.getElementById('connLabel').textContent="OFFLINE";
+    document.getElementById('connBtn').textContent="CONNECT";
+    document.getElementById('connBtn').classList.remove("active");
   };
 }
 </script>
